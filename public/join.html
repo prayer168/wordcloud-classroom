@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>文字雲課堂 · 參與</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100dvh;
+      background: linear-gradient(145deg, #0a192f 0%, #112240 60%, #0d2137 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      padding: 20px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 28px;
+      padding: 44px 32px 36px;
+      width: 100%;
+      max-width: 440px;
+      color: #fff;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* ── Header ── */
+    .header { text-align: center; margin-bottom: 36px; }
+    .header .icon { font-size: 46px; margin-bottom: 14px; display: block; }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #64ffda;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+    .header p {
+      font-size: 14px;
+      color: #a8b2d8;
+      line-height: 1.5;
+    }
+
+    /* ── Textarea ── */
+    .input-wrap { position: relative; margin-bottom: 8px; }
+
+    textarea {
+      width: 100%;
+      height: 148px;
+      background: rgba(255,255,255,0.06);
+      border: 2px solid rgba(100,255,218,0.25);
+      border-radius: 16px;
+      color: #fff;
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 16px;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    textarea:focus {
+      border-color: #64ffda;
+      box-shadow: 0 0 0 4px rgba(100,255,218,0.1);
+    }
+    textarea::placeholder { color: rgba(255,255,255,0.22); }
+
+    /* ── Character counter ── */
+    .counter-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 22px;
+    }
+    .char-counter {
+      font-size: 12px;
+      color: #a8b2d8;
+      transition: color 0.2s;
+    }
+    .char-counter.warn  { color: #ffbf69; }
+    .char-counter.limit { color: #ff6b6b; font-weight: 700; }
+
+    /* ── Submit button ── */
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #64ffda 0%, #00b4d8 100%);
+      color: #0a192f;
+      border: none;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: all 0.25s;
+      font-family: inherit;
+    }
+    .submit-btn:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px rgba(100,255,218,0.3);
+    }
+    .submit-btn:not(:disabled):active { transform: translateY(0); }
+    .submit-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* ── Success screen ── */
+    .success-screen {
+      display: none;
+      text-align: center;
+      animation: fadeUp 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    .check-circle {
+      width: 80px; height: 80px;
+      background: linear-gradient(135deg, #64ffda, #00b4d8);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      margin: 0 auto 20px;
+      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+    }
+
+    .success-screen h2 {
+      font-size: 22px;
+      color: #64ffda;
+      margin-bottom: 8px;
+    }
+    .success-screen .sub {
+      font-size: 14px;
+      color: #a8b2d8;
+      margin-bottom: 24px;
+    }
+
+    .submitted-bubble {
+      background: rgba(100,255,218,0.08);
+      border: 1px solid rgba(100,255,218,0.3);
+      border-radius: 14px;
+      padding: 14px 20px;
+      font-size: 17px;
+      color: #64ffda;
+      margin-bottom: 28px;
+      word-break: break-all;
+      line-height: 1.6;
+    }
+
+    .again-btn {
+      background: transparent;
+      color: #64ffda;
+      border: 2px solid rgba(100,255,218,0.5);
+      border-radius: 14px;
+      padding: 12px 36px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+    .again-btn:hover {
+      background: rgba(100,255,218,0.08);
+      border-color: #64ffda;
+    }
+
+    /* ── Offline notice ── */
+    #offline-bar {
+      display: none;
+      background: #ff6b6b;
+      color: #fff;
+      text-align: center;
+      padding: 8px;
+      font-size: 13px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes popIn {
+      from { transform: scale(0.4); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Offline notice -->
+  <div id="offline-bar">⚠ 連線已中斷，請重新整理頁面</div>
+
+  <!-- ── Input Form ───────────────────────────── -->
+  <div id="form-screen">
+    <div class="header">
+      <span class="icon">💬</span>
+      <h1>分享你的想法</h1>
+      <p>輸入關鍵詞或一句話，最多 50 個字</p>
+    </div>
+
+    <div class="input-wrap">
+      <textarea
+        id="text-input"
+        maxlength="50"
+        placeholder="在這裡輸入你想說的話…"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      ></textarea>
+    </div>
+
+    <div class="counter-row">
+      <span class="char-counter" id="char-counter">0 / 50</span>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" disabled onclick="submitWord()">
+      提交
+    </button>
+  </div>
+
+  <!-- ── Success Screen ─────────────────────── -->
+  <div class="success-screen" id="success-screen">
+    <div class="check-circle">✓</div>
+    <h2>提交成功！</h2>
+    <p class="sub">您的詞語已出現在課堂大螢幕上</p>
+    <div class="submitted-bubble" id="submitted-bubble"></div>
+    <button class="again-btn" onclick="resetForm()">再提交一次</button>
+  </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket     = io();
+  let submitting   = false;
+
+  // ── Connection state ──
+  socket.on('disconnect', () => {
+    document.getElementById('offline-bar').style.display = 'block';
+  });
+  socket.on('connect', () => {
+    document.getElementById('offline-bar').style.display = 'none';
+  });
+
+  // ── Character counter ──
+  const textInput  = document.getElementById('text-input');
+  const charCounter = document.getElementById('char-counter');
+  const submitBtn  = document.getElementById('submit-btn');
+
+  textInput.addEventListener('input', () => {
+    const len = textInput.value.length;
+    charCounter.textContent = `${len} / 50`;
+    charCounter.className   = 'char-counter' +
+      (len >= 50 ? ' limit' : len >= 40 ? ' warn' : '');
+    submitBtn.disabled = len === 0 || submitting;
+  });
+
+  // Allow Enter to submit (Shift+Enter = newline)
+  textInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!submitBtn.disabled) submitWord();
+    }
+  });
+
+  // ── Submit ──
+  function submitWord() {
+    const text = textInput.value.trim();
+    if (!text || submitting) return;
+
+    submitting = true;
+    submitBtn.disabled   = true;
+    submitBtn.textContent = '提交中⋯';
+
+    socket.emit('submit-word', text, (ack) => {
+      // server acknowledgement (optional)
+    });
+
+    // Show success after brief delay
+    setTimeout(() => {
+      document.getElementById('submitted-bubble').textContent = `「${text}」`;
+      document.getElementById('form-screen').style.display    = 'none';
+      const suc = document.getElementById('success-screen');
+      suc.style.display = 'block';
+      submitting = false;
+    }, 400);
+  }
+
+  // ── Reset form for another submission ──
+  function resetForm() {
+    textInput.value             = '';
+    charCounter.textContent     = '0 / 50';
+    charCounter.className       = 'char-counter';
+    submitBtn.disabled          = true;
+    submitBtn.textContent       = '提交';
+
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('form-screen').style.display    = 'block';
+    textInput.focus();
+  }
+</script>
+</body>
+</html>

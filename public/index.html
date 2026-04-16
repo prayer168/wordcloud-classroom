@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文字雲課堂</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #0a192f;
+      --toolbar:   rgba(5, 12, 30, 0.85);
+      --accent:    #64ffda;
+      --highlight: #ff6b6b;
+      --muted:     #a8b2d8;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      transition: background 0.6s ease;
+      user-select: none;
+    }
+
+    /* ── Toolbar ───────────────────────────────────── */
+    #toolbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: var(--toolbar);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      z-index: 200;
+    }
+
+    #toolbar .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-right: auto;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    #counter-badge {
+      background: rgba(255,255,255,0.08);
+      color: var(--muted);
+      font-size: 13px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    select, .btn {
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      outline: none;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    select {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    select option { background: #1a2744; color: #fff; }
+
+    .btn { font-weight: 600; }
+    .btn:hover { transform: translateY(-1px); opacity: 0.9; }
+    .btn:active { transform: translateY(0); }
+
+    .btn-accent   { background: var(--accent);    color: #0a192f; }
+    .btn-ghost    { background: rgba(255,255,255,0.1); color: #fff; }
+    .btn-danger   { background: #ff6b6b;           color: #fff; }
+
+    /* ── Word Cloud Canvas ─────────────────────────── */
+    #wc-canvas {
+      position: absolute;
+      top: 56px; left: 0;
+      width: 100%;
+      height: calc(100vh - 56px);
+      display: block;
+    }
+
+    /* ── QR Panel ──────────────────────────────────── */
+    #qr-panel {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 16px 12px;
+      text-align: center;
+      z-index: 150;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s;
+    }
+    #qr-panel.hidden {
+      transform: translateX(240px);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #qr-panel p.label {
+      font-size: 12px;
+      color: #555;
+      margin-top: 10px;
+    }
+    #qr-panel .url-text {
+      font-size: 10px;
+      color: #0a192f;
+      font-weight: 700;
+      word-break: break-all;
+      max-width: 160px;
+      margin-top: 4px;
+    }
+
+    /* ── Rain drop animation ───────────────────────── */
+    .rain-word {
+      position: fixed;
+      top: 56px;
+      font-weight: 700;
+      pointer-events: none;
+      z-index: 300;
+      white-space: nowrap;
+      animation: rainFall 1.8s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+    }
+
+    @keyframes rainFall {
+      0%   { transform: translateY(-60px) scale(1.4); opacity: 1; }
+      60%  { opacity: 0.9; }
+      100% { transform: translateY(60vh) scale(0.6); opacity: 0; }
+    }
+
+    /* ── Tooltip ───────────────────────────────────── */
+    #tooltip {
+      position: fixed;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 400;
+      display: none;
+      backdrop-filter: blur(6px);
+    }
+
+    /* ── Reset Modal ───────────────────────────────── */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.show { display: flex; }
+
+    #modal-box {
+      background: #1a2744;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 36px 32px;
+      text-align: center;
+      width: 340px;
+      max-width: 90vw;
+      animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes popIn {
+      from { transform: scale(0.85); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+
+    #modal-box .modal-icon { font-size: 44px; margin-bottom: 12px; }
+    #modal-box h2 { color: #ff6b6b; margin-bottom: 10px; font-size: 20px; }
+    #modal-box p  { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 28px; }
+    #modal-box .btn-row { display: flex; gap: 12px; justify-content: center; }
+
+    /* ── Empty state overlay ──────────────────────── */
+    #empty-hint {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+    #empty-hint .hint-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+    #empty-hint p { color: rgba(255,255,255,0.25); font-size: 18px; }
+    #empty-hint.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Toolbar ──────────────────────────────────────────── -->
+<div id="toolbar">
+  <div class="logo">☁ 文字雲課堂</div>
+  <span id="counter-badge">0 則提交</span>
+
+  <select id="theme-select" onchange="applyTheme(this.value)" title="顏色主題">
+    <option value="ocean">🌊 海洋藍</option>
+    <option value="forest">🌿 森林綠</option>
+    <option value="sunset">🌅 日落橙</option>
+    <option value="purple">🌌 夜空紫</option>
+    <option value="mono">◻ 經典黑白</option>
+  </select>
+
+  <button class="btn btn-ghost"   onclick="toggleQR()">📱 QR Code</button>
+  <button class="btn btn-accent"  onclick="downloadPNG()">⬇ PNG</button>
+  <button class="btn btn-ghost"   onclick="downloadTXT()">📄 TXT</button>
+  <button class="btn btn-danger"  onclick="showResetModal()">↺ 重設</button>
+</div>
+
+<!-- ── Canvas ───────────────────────────────────────────── -->
+<canvas id="wc-canvas"></canvas>
+
+<!-- ── Empty hint ───────────────────────────────────────── -->
+<div id="empty-hint">
+  <div class="hint-icon">💬</div>
+  <p>等待學生掃碼提交詞語…</p>
+</div>
+
+<!-- ── QR Panel ─────────────────────────────────────────── -->
+<div id="qr-panel">
+  <div id="qrcode-el"></div>
+  <p class="label">掃碼參與課堂</p>
+  <div class="url-text" id="url-display">載入中…</div>
+</div>
+
+<!-- ── Tooltip ──────────────────────────────────────────── -->
+<div id="tooltip"></div>
+
+<!-- ── Reset Modal ──────────────────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <h2>確認重設課堂？</h2>
+    <p>這將清除所有已提交的詞語。<br>操作無法復原，請謹慎操作。</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost"  onclick="hideResetModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmReset()">確認重設</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Libraries ────────────────────────────────────────── -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Color Themes
+// ═══════════════════════════════════════════════════════════
+const THEMES = {
+  ocean: {
+    bg:        '#0a192f',
+    toolbar:   'rgba(5,12,30,0.85)',
+    colors:    ['#64ffda','#00b4d8','#90e0ef','#48cae4','#caf0f8'],
+    highlight: '#ff6b6b',
+    accent:    '#64ffda'
+  },
+  forest: {
+    bg:        '#0d1f0d',
+    toolbar:   'rgba(5,15,5,0.85)',
+    colors:    ['#52b788','#95d5b2','#d8f3dc','#74c69d','#b7e4c7'],
+    highlight: '#ffd60a',
+    accent:    '#52b788'
+  },
+  sunset: {
+    bg:        '#1a0800',
+    toolbar:   'rgba(20,5,0,0.85)',
+    colors:    ['#ff9f1c','#ffbf69','#ff6b35','#f4a261','#e76f51'],
+    highlight: '#ff006e',
+    accent:    '#ff9f1c'
+  },
+  purple: {
+    bg:        '#0d0d1a',
+    toolbar:   'rgba(5,5,15,0.85)',
+    colors:    ['#9b5de5','#f15bb5','#fee440','#00bbf9','#00f5d4'],
+    highlight: '#ff6b6b',
+    accent:    '#9b5de5'
+  },
+  mono: {
+    bg:        '#f5f5f5',
+    toolbar:   'rgba(240,240,240,0.92)',
+    colors:    ['#212529','#495057','#6c757d','#343a40','#1a1a2e'],
+    highlight: '#e63946',
+    accent:    '#212529'
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════
+let currentTheme = 'ocean';
+let wordsData    = {};   // { text: count }
+let totalCount   = 0;
+let qrVisible    = true;
+let renderTimer  = null;
+let wordPositions = {};  // for hover detection
+
+// ═══════════════════════════════════════════════════════════
+// Socket.io
+// ═══════════════════════════════════════════════════════════
+const socket = io();
+
+socket.on('init', ({ words, count }) => {
+  wordsData   = words  || {};
+  totalCount  = count  || 0;
+  updateCounter();
+  renderCloud();
+});
+
+socket.on('new-word', ({ text, words, count }) => {
+  wordsData  = words;
+  totalCount = count;
+  updateCounter();
+  showRainDrop(text);
+  scheduleRender(1400);
+});
+
+socket.on('room-reset', () => {
+  wordsData  = {};
+  totalCount = 0;
+  updateCounter();
+  renderCloud();
+});
+
+// ═══════════════════════════════════════════════════════════
+// Counter
+// ═══════════════════════════════════════════════════════════
+function updateCounter() {
+  document.getElementById('counter-badge').textContent = `${totalCount} 則提交`;
+  const hint = document.getElementById('empty-hint');
+  hint.classList.toggle('hidden', Object.keys(wordsData).length > 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Word Cloud Rendering
+// ═══════════════════════════════════════════════════════════
+function scheduleRender(delay = 0) {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(renderCloud, delay);
+}
+
+function renderCloud() {
+  const canvas = document.getElementById('wc-canvas');
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  canvas.width  = W;
+  canvas.height = H;
+
+  const theme = THEMES[currentTheme];
+  const ctx   = canvas.getContext('2d');
+
+  // Clear with theme background
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const entries = Object.entries(wordsData);
+  if (entries.length === 0) return;
+
+  // ── Determine highlight threshold (top ~20%) ──
+  const counts   = entries.map(([, c]) => c).sort((a, b) => b - a);
+  const topIdx   = Math.max(0, Math.ceil(counts.length * 0.2) - 1);
+  const threshold = counts[topIdx];
+  const maxCount  = counts[0];
+
+  // ── Adjust size for phrase length ──
+  const MAX_FONT = Math.min(W / 5, 110);
+  const MIN_FONT = 20;
+
+  const list = entries.map(([word, count]) => {
+    const lengthPenalty = Math.max(0.35, 1 - Math.max(0, word.length - 8) * 0.025);
+    return [word, count * lengthPenalty];
+  });
+
+  // Sort by adjusted weight desc so important words are placed first
+  list.sort((a, b) => b[1] - a[1]);
+  const maxAdj = list[0]?.[1] || 1;
+
+  // ── Colour picker (stable per word) ──
+  const colorCache = {};
+  function wordColor(word, count) {
+    if (count >= threshold && counts.length > 1) return theme.highlight;
+    if (!colorCache[word]) {
+      colorCache[word] = theme.colors[
+        Math.abs(hashCode(word)) % theme.colors.length
+      ];
+    }
+    return colorCache[word];
+  }
+
+  wordPositions = {};
+
+  WordCloud(canvas, {
+    list,
+    gridSize:     Math.round(10 * W / 1024),
+    weightFactor: (size) => {
+      return Math.max(MIN_FONT, (size / maxAdj) * MAX_FONT);
+    },
+    fontFamily:   '"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif',
+    fontWeight:   '700',
+    color:        (word, weight) => wordColor(word, wordsData[word] || 0),
+    rotateRatio:  0.25,
+    rotationSteps: 2,
+    backgroundColor: theme.bg,
+    drawOutOfBound:  false,
+    shrinkToFit:     true,
+    hover: (item, dimension, event) => {
+      const tip = document.getElementById('tooltip');
+      if (item && dimension) {
+        tip.style.display = 'block';
+        tip.style.left    = (event.clientX + 14) + 'px';
+        tip.style.top     = (event.clientY - 10) + 'px';
+        const count = wordsData[item[0]] || 0;
+        tip.textContent   = `「${item[0]}」 · 出現 ${count} 次`;
+      } else {
+        tip.style.display = 'none';
+      }
+    },
+    click: (item) => {
+      // no-op, hover tooltip is enough
+    }
+  });
+}
+
+function hashCode(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return h;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Rain Drop Animation
+// ═══════════════════════════════════════════════════════════
+function showRainDrop(text) {
+  const theme = THEMES[currentTheme];
+  const el    = document.createElement('div');
+  el.className    = 'rain-word';
+  el.textContent  = text;
+
+  const maxLen  = Math.max(2, text.length);
+  const fontSize = Math.max(14, Math.min(28, 380 / maxLen));
+  el.style.cssText = `
+    font-size: ${fontSize}px;
+    color: ${theme.highlight};
+    text-shadow: 0 0 18px ${theme.highlight}, 0 0 6px rgba(255,255,255,0.4);
+    left: ${10 + Math.random() * 70}vw;
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Theme
+// ═══════════════════════════════════════════════════════════
+function applyTheme(name) {
+  currentTheme = name;
+  const t = THEMES[name];
+  document.body.style.background = t.bg;
+  document.documentElement.style.setProperty('--bg',        t.bg);
+  document.documentElement.style.setProperty('--accent',    t.accent);
+  document.documentElement.style.setProperty('--highlight', t.highlight);
+  renderCloud();
+}
+
+// ═══════════════════════════════════════════════════════════
+// QR Code
+// ═══════════════════════════════════════════════════════════
+const JOIN_URL = window.location.origin + '/join';
+document.getElementById('url-display').textContent = JOIN_URL;
+
+new QRCode(document.getElementById('qrcode-el'), {
+  text:         JOIN_URL,
+  width:        160,
+  height:       160,
+  colorDark:    '#0a192f',
+  colorLight:   '#ffffff',
+  correctLevel: QRCode.CorrectLevel.H
+});
+
+function toggleQR() {
+  qrVisible = !qrVisible;
+  document.getElementById('qr-panel').classList.toggle('hidden', !qrVisible);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Download PNG
+// ═══════════════════════════════════════════════════════════
+function downloadPNG() {
+  const canvas = document.getElementById('wc-canvas');
+  const date   = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
+  const link   = document.createElement('a');
+  link.download = `文字雲_${date}.png`;
+  link.href     = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Download TXT
+// ═══════════════════════════════════════════════════════════
+function downloadTXT() {
+  const sorted  = Object.entries(wordsData).sort(([,a],[,b]) => b - a);
+  const date    = new Date().toLocaleString('zh-CN');
+  const sep     = '─'.repeat(36);
+
+  const lines = [
+    '文字雲課堂　詞語彙整報告',
+    sep,
+    `匯出時間：${date}`,
+    `提交總數：${totalCount} 則　　不同詞語：${sorted.length} 個`,
+    sep,
+    '',
+    '詞語（依出現次數排序）',
+    '',
+    ...sorted.map(([word, count], i) =>
+      `${String(i + 1).padStart(3, ' ')}. ${word}  (×${count})`
+    ),
+    '',
+    sep,
+  ];
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.download = `文字雲_${new Date().toLocaleDateString('zh-TW').replace(/\//g, '-')}.txt`;
+  link.href     = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Reset Modal
+// ═══════════════════════════════════════════════════════════
+function showResetModal()  { document.getElementById('modal-overlay').classList.add('show'); }
+function hideResetModal()  { document.getElementById('modal-overlay').classList.remove('show'); }
+
+function confirmReset() {
+  socket.emit('reset-room');
+  hideResetModal();
+}
+
+// Close modal on backdrop click
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) hideResetModal();
+});
+
+// ═══════════════════════════════════════════════════════════
+// Resize
+// ═══════════════════════════════════════════════════════════
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderCloud, 300);
+});
+
+// ── Initial render ──
+renderCloud();
+</script>
+</body>
+</html>
