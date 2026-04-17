@@ -121,7 +121,9 @@
     #qr-panel .url-text {
       font-size: 10px; color: #0a192f; font-weight: 700;
       word-break: break-all; max-width: 160px; margin-top: 4px;
+      text-decoration: underline; cursor: pointer;
     }
+    #qr-panel .url-text:hover { color: #00b4d8; }
 
     /* ── Tooltip ───────────────────────────────────── */
     #tooltip {
@@ -228,7 +230,7 @@
 <div id="qr-panel">
   <div id="qrcode-el"></div>
   <p class="label">掃碼參與課堂</p>
-  <div class="url-text" id="url-display">載入中…</div>
+  <a class="url-text" id="url-display" href="#" target="_blank" rel="noopener">載入中…</a>
 </div>
 
 <!-- ── Tooltip ──────────────────────────────────────────── -->
@@ -455,7 +457,9 @@ function applyTheme(name) {
 // QR Code
 // ═══════════════════════════════════════════════════════════
 const JOIN_URL = new URL('join.html', window.location.href).href;
-document.getElementById('url-display').textContent = JOIN_URL;
+const urlDisplay = document.getElementById('url-display');
+urlDisplay.textContent = JOIN_URL;
+urlDisplay.href = JOIN_URL;
 
 new QRCode(document.getElementById('qrcode-el'), {
   text: JOIN_URL, width: 160, height: 160,
